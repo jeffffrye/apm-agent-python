@@ -186,7 +186,10 @@ class ElasticAPM:
         
         else:
             # Still consume body from receive, even though we're not capturing it
-            asyncio.run(receive())
+            while True:
+                message = await receive()
+                if not message:
+                    break
 
         request = Request(scope, receive=_mocked_receive or receive)
         await self._request_started(request)
