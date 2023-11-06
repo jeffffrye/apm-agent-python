@@ -183,6 +183,10 @@ class ElasticAPM:
                 return {"type": "http.request", "body": joined_body}
 
             _request_receive = request_receive
+        
+        else:
+            # Still consume body from receive, even though we're not capturing it
+            asyncio.run(receive())
 
         request = Request(scope, receive=_mocked_receive or receive)
         await self._request_started(request)
