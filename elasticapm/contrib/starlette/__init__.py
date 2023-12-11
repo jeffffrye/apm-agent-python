@@ -27,25 +27,26 @@
 #  SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER
 #  CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
 #  OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-
-
-from __future__ import absolute_import
-
 import asyncio
 import functools
-from typing import Dict, Optional
+from typing import Dict
+from typing import Optional
 
 import starlette
 from starlette.requests import Request
-from starlette.routing import Match, Mount
-from starlette.types import ASGIApp, Message
+from starlette.routing import Match
+from starlette.routing import Mount
+from starlette.types import ASGIApp
+from starlette.types import Message
 
-import elasticapm
 import elasticapm.instrumentation.control
-from elasticapm.base import Client, get_client
+from elasticapm.base import Client
+from elasticapm.base import get_client
 from elasticapm.conf import constants
 from elasticapm.contrib.asyncio.traces import set_context
-from elasticapm.contrib.starlette.utils import get_body, get_data_from_request, get_data_from_response
+from elasticapm.contrib.starlette.utils import get_body
+from elasticapm.contrib.starlette.utils import get_data_from_request
+from elasticapm.contrib.starlette.utils import get_data_from_response
 from elasticapm.utils.disttracing import TraceParent
 from elasticapm.utils.encoding import long_field
 from elasticapm.utils.logging import get_logger
@@ -151,12 +152,13 @@ class ElasticAPM:
         _mocked_receive = None
         _request_receive = None
 
-        if self.client.config.capture_body != "off":
+        body = []
+        joined_body = b""
 
+        if self.client.config.capture_body != "off":
             # When we consume the body from receive, we replace the streaming
             # mechanism with a mocked version -- this workaround came from
             # https://github.com/encode/starlette/issues/495#issuecomment-513138055
-            body = []
             while True:
                 message = await receive()
                 if not message:
@@ -172,19 +174,19 @@ class ElasticAPM:
 
             joined_body = b"".join(body)
 
-            async def mocked_receive() -> Message:
-                await asyncio.sleep(0)
-                return {"type": "http.request", "body": long_field(joined_body)}
-
-            _mocked_receive = mocked_receive
-
             async def request_receive() -> Message:
                 await asyncio.sleep(0)
                 return {"type": "http.request", "body": joined_body}
 
             _request_receive = request_receive
 
-        request = Request(scope, receive=_mocked_receive or receive)
+        async def mocked_receive() -> Message:
+            await asyncio.sleep(0)
+            return {"type": "http.request", "body": long_field(joined_body) or body}
+
+        _mocked_receive = mocked_receive
+
+        request = Request(scope, receive=_mocked_receive)
         await self._request_started(request)
 
         # We don't end the transaction here, we rely on the starlette
